@@ -1,0 +1,16 @@
+# Python cache
+*.pyc
+__pycache__/
+
+# IDEA
+.idea/
+
+# Virtual environments
+env/
+venv/
+
+# Datasets
+data/
+
+# Jupyter Notebook
+.ipynb_checkpoints/
