@@ -1,7 +1,9 @@
-import os
+import string
 from typing import List
-import numpy as np
 from scipy.sparse import lil_matrix
+from nltk.tokenize import word_tokenize
+from nltk.stem.porter import PorterStemmer
+from nltk.corpus import stopwords
 
 
 class Index:
@@ -10,22 +12,26 @@ class Index:
 
     Attributes
     ----------
-    terms: dict
-        The vocabulary of the collection where (key, value) = (term (str), id_term (int)).
-    documents: dict
-        The collection of documents where (key, value) = (id doc (int), content of doc (list)).
+    terms_to_id: dict
+        The vocabulary (stemmed words) of the collection where (key, value) = (term (str), id_term (int)).
+    id_to_term: dict
+        Same dictionary in reverse order (key, value) = (id_term (int), term (str)).
+    doc_to_id: dict
+        The collection of documents where (key, value) = ('id_doc - title'(str), id_doc (int)).
+    id_to_doc: dict
+        Same dictionary in reverse order (key, value) = (id_doc (int), 'id_doc - title'(str)).
+    incidence_matrix: dict
+        Incidence matrix to map terms to their documents.
     """
 
     def __init__(self):
         self.terms_to_id = {}
         self.id_to_term = {}
-        # self.documents = {}
         self.doc_to_id = {}
         self.id_to_doc = {}
-        # self.inverted_index = [] # list of numpy arrays
-        self.incidence_matrix = lil_matrix([])  # Unsure if it's most efficient
+        self.incidence_matrix = lil_matrix([])
 
-    def build(self, filename: str):
+    def build_cacm(self, filename: str):
         raise NotImplementedError
 
     def treat_query(self, query: str) -> List[str]:
@@ -38,105 +44,44 @@ class Index:
         raise NotImplementedError
 
     @staticmethod
-    def normalize(term: str) -> str:
-        term = term.lower()
-        term.replace("; ", " ")
-        term.replace(", ", " ")
-        term.replace("(", "")
-        term.replace(")", "")
-        return term
+    def normalize(sentence: str) -> List[str]:
+        """
+        Normalize the given sentence by:
+            - Transforming the English contractions to full words
+            - Transforming composed words into 2 separated words
+            - Tokenizing into words based on white space and punctuation
+            - Converting to lower case
+            - Removing punctuation
+            - Removing non-alphabetical tokens
+            - Filtering stop words
+            - Stemming words
 
+        Inspired from : https://machinelearningmastery.com/clean-text-machine-learning-python/
+        """
+        # Take care of English contractions, from: https://en.wikipedia.org/wiki/Wikipedia:List_of_English_contractions
+        sentence = sentence.replace("'s", ' is')
+        sentence = sentence.replace("n't", ' not')
+        sentence = sentence.replace("'re", ' are')
+        sentence = sentence.replace("'m", ' am')
+        sentence = sentence.replace("'ve", ' have')
+        sentence = sentence.replace("'ll", ' will')
+        sentence = sentence.replace("'d", ' would')
+        sentence = sentence.replace("-", ' ')
 
-class BooleanIndex(Index):
-    def __init__(self, filename: str):
-        super().__init__()
-        # self.build(filename)
+        # Tokenize
+        tokens = word_tokenize(sentence)
+        # Convert to lower case
+        tokens = [w.lower() for w in tokens]
+        # Remove punctuation from each word
+        table = str.maketrans('', '', string.punctuation)
+        stripped = [w.translate(table) for w in tokens]
+        # Remove remaining tokens that are not alphabetic
+        words = [word for word in stripped if word.isalpha()]
+        # Filter out stop words
+        stop_words = set(stopwords.words('english'))
+        words = [w for w in words if not w in stop_words]
+        # Stemming of words
+        porter = PorterStemmer()
+        stemmed_words = [porter.stem(word) for word in words]
 
-    # TODO : transform into a matrix/sparse matrix ?
-    def build_cacm(self, filename: str):
-        # filename = 'cacm.all'
-        raw_file = np.loadtxt(filename, dtype=str, delimiter="someneverhappeningstr")
-        keep_element = False
-
-        doc_id = -1
-        term_id = -1
-
-        nb_terms = 17542
-        nb_docs = 3204  # nb of docs in cacm.all
-        self.incidence_matrix = lil_matrix((nb_terms, nb_docs))
-
-        for row in raw_file:
-            if row.startswith("."):
-                if row.startswith(".I"):
-                    doc_id += 1  # assumption : docs are read in order
-                    # if nb_docs / 2 <= doc_id < nb_docs / 2 + 1:
-                    #     print("At half the docs : ")
-                    #     print("Vocabulary size : {}".format(len(term_dic)))
-                    #     print("Nb tokens : {}".format(sum(term_dic.values())))
-                elif row.startswith(".T") or row.startswith(".W") or row.startswith(".K"):
-                    keep_element = True
-                    if row.startswith(".T"):
-                        was_title = True
-                    else:
-                        was_title = False
-                else:
-                    keep_element = False
-            elif keep_element:
-                # Map a doc to is ID
-                if was_title:
-                    self.doc_to_id[row + str(doc_id)] = doc_id  # Some titles are not unique
-                    self.id_to_doc[doc_id] = row + str(doc_id)
-                    was_title = False
-
-                row = self.normalize(row)
-
-                terms = row.split(" ")
-                for term in terms:
-                    # term = self.normalize(term)  # TODO
-                    if term != "":
-                        if term not in self.terms_to_id.keys():
-                            term_id += 1
-                            self.terms_to_id[term] = term_id
-                            self.id_to_term[term_id] = term
-                        # if term_id > 17541:
-                        #     print(term_id)
-                        # if doc_id > 3200:
-                        #     print(doc_id)
-                        self.incidence_matrix[term_id, doc_id] = 1  # Boolean index
-
-        self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
-        print(len(self.doc_to_id), len(self.id_to_doc), len(self.terms_to_id), len(self.id_to_term))
-        print(self.incidence_matrix.shape)
-        print(doc_id)
-
-    def treat_query(self, query: str) -> np.array:
-        query_words = query.split()
-        bool_operations = []
-        bool_terms = []
-        for word in query_words:
-            if word in ["AND", "NOT", 'OR']:  # TODO : add OR
-                bool_operations.append(word)
-            else:
-                term = self.normalize(word)
-                # TODO : check if term != ''
-                bool_terms.append(self.terms_to_id[term])  # Get the corresponding id
-        bool_result = self.compute_bool_result(bool_operations, bool_terms)
-        return np.where(bool_result == 1)[0]
-
-    def compute_bool_result(self, operations: List[str], bool_terms: List[int]) -> lil_matrix:
-        result = self.incidence_matrix[bool_terms[0], :]
-        idx_term = 1
-        for i in range(len(operations)):
-            term = []
-            if operations[i] == "NOT":
-                term = [abs(coefficient - 1) for coefficient in bool_terms[i + 1]]  # TODO: adapt to sparse
-            elif operations[i] == "AND":
-                term = self.incidence_matrix[bool_terms[0], :]
-            result = result.dot(term)
-        return result
-
-
-if __name__ == '__main__':
-    PATH_TO_DATA = 'data'
-    index = BooleanIndex('')
-    index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
+        return stemmed_words
