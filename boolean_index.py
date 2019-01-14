@@ -57,15 +57,19 @@ class BooleanIndex(Index):
 
         self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
 
-    def build_cs276(self,directory_name : str, from_saved_dict : bool):
+    def build_cs276(self,directory_name : str, from_saved_matrix : bool):
         """
         Uses the CS276 (Stanford) collection to build the class attributes
+
+        Args :
+            directory_name : String containing the path to the CS276 dataset (pa1-data)
+            from_saved_matrix  : True in order not to read again the whole dataset and load a saved matrix
         """
         doc_id = -1
         term_id = -1
 
-        nb_terms = 5462
-        nb_docs = 3204
+        nb_terms = 353975
+        nb_docs = 98998
         self.incidence_matrix = lil_matrix((nb_terms, nb_docs))
 
         for block_id in range(10) :
@@ -75,6 +79,7 @@ class BooleanIndex(Index):
                 # Adding the document to both doc_to_id and id_to_doc dictionaries
                 doc_id += 1
                 doc = os.path.join(str(block_id),filename)
+                print("Reading "+doc+"...")
                 self.doc_to_id[doc] = doc_id
                 self.id_to_doc[doc_id] = doc
                 #Reading the document
@@ -126,6 +131,6 @@ if __name__ == '__main__':
     PATH_TO_DATA = 'data'
 
     index = BooleanIndex()
-    index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
-
+    #index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
+    index.build_cs276(os.path.join("..", "pa1-data", "pa1-data"),False)
     # index.treat_query('Assistant OR program')
