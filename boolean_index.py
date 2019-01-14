@@ -57,6 +57,31 @@ class BooleanIndex(Index):
 
         self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
 
+    def build_cs276(self,directory_name : str, from_saved_dict : bool):
+        """
+        Uses the CS276 (Stanford) collection to build the class attributes
+        """
+        terms = []
+        docs = []
+        count = []
+        list_of_files = os.listdir(directory_name)
+        for fileName in list_of_files:
+            file = open(os.path.join(directory_name, fileName), "r")
+            tokens_in_file = dict()  # Temporary dictionnary to count the frequency of each token in the document
+            content = file.readlines()
+            for line in content:
+                words = line.split(" ")
+                for word in words:
+                    if word not in common_words:
+                        tokens_in_file[word] = tokens_in_file.get(word, 0) + 1
+                        terms.append(term_ids[word])
+                        docs.append(doc_ids[fileName])
+                        count.append(tokens_in_file[word])
+        terms = np.array(terms)
+        docs = np.array(docs)
+        count = np.array(count)
+        self.incidence_matrix = csc_matrix((count, (terms, docs)))
+
     def treat_query(self, query: str) -> np.array:
         print(query)
         query_words = query.split()
