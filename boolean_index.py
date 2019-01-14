@@ -61,26 +61,35 @@ class BooleanIndex(Index):
         """
         Uses the CS276 (Stanford) collection to build the class attributes
         """
-        terms = []
-        docs = []
-        count = []
-        list_of_files = os.listdir(directory_name)
-        for fileName in list_of_files:
-            file = open(os.path.join(directory_name, fileName), "r")
-            tokens_in_file = dict()  # Temporary dictionnary to count the frequency of each token in the document
-            content = file.readlines()
-            for line in content:
-                words = line.split(" ")
-                for word in words:
-                    if word not in common_words:
-                        tokens_in_file[word] = tokens_in_file.get(word, 0) + 1
-                        terms.append(term_ids[word])
-                        docs.append(doc_ids[fileName])
-                        count.append(tokens_in_file[word])
-        terms = np.array(terms)
-        docs = np.array(docs)
-        count = np.array(count)
-        self.incidence_matrix = csc_matrix((count, (terms, docs)))
+        doc_id = -1
+        term_id = -1
+
+        nb_terms = 5462
+        nb_docs = 3204
+        self.incidence_matrix = lil_matrix((nb_terms, nb_docs))
+
+        for block_id in range(10) :
+            list_of_files = os.listdir(os.path.join(directory_name, str(block_id)))
+            for filename in list_of_files:
+                file = open(os.path.join(directory_name, str(block_id), filename), "r")
+                # Adding the document to both doc_to_id and id_to_doc dictionaries
+                doc_id += 1
+                doc = os.path.join(str(block_id),filename)
+                self.doc_to_id[doc] = doc_id
+                self.id_to_doc[doc_id] = doc
+                #Reading the document
+                content = file.readlines()
+                for line in content:
+                    terms = self.normalize(line)
+                    for term in terms:
+                        if term != "":
+                            if term not in self.terms_to_id.keys():
+                                term_id += 1
+                                self.terms_to_id[term] = term_id
+                                self.id_to_term[term_id] = term
+                            self.incidence_matrix[self.terms_to_id[term], doc_id] += 1
+
+        self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
 
     def treat_query(self, query: str) -> np.array:
         print(query)
