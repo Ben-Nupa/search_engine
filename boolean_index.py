@@ -1,7 +1,7 @@
 import os
 from typing import List
 import numpy as np
-from scipy.sparse import lil_matrix, csc_matrix
+from scipy.sparse import lil_matrix, csc_matrix, save_npz
 from index import Index
 
 
@@ -74,16 +74,17 @@ class BooleanIndex(Index):
 
         for block_id in range(10) :
             list_of_files = os.listdir(os.path.join(directory_name, str(block_id)))
+            block_inc_matrix = lil_matrix((nb_terms,nb_docs))
             for filename in list_of_files:
                 file = open(os.path.join(directory_name, str(block_id), filename), "r")
                 # Adding the document to both doc_to_id and id_to_doc dictionaries
                 doc_id += 1
                 doc = os.path.join(str(block_id),filename)
-                print("Reading "+doc+"...")
                 self.doc_to_id[doc] = doc_id
                 self.id_to_doc[doc_id] = doc
                 #Reading the document
                 content = file.readlines()
+                file.close()
                 for line in content:
                     terms = self.normalize(line)
                     for term in terms:
@@ -92,14 +93,18 @@ class BooleanIndex(Index):
                                 term_id += 1
                                 self.terms_to_id[term] = term_id
                                 self.id_to_term[term_id] = term
-                            self.incidence_matrix[self.terms_to_id[term], doc_id] += 1
-        self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
+                            #self.incidence_matrix[self.terms_to_id[term], doc_id] = 1 # +=1 if we want to count the frequency of the term
+                            block_inc_matrix[self.terms_to_id[term], doc_id] = 1
+            print("Saving block " + str(block_id))
+            save_npz("block_inc_matrix"+str(block_id)+".npz", block_inc_matrix)
+        #self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
+        #save_npz("incidence_matrix.npz", self.incidence_matrix)
 
     def treat_query(self, query: str) -> np.array:
         print(query)
         query_words = query.split()
         bool_operations = []
-        bool_terms = []<
+        bool_terms = []
         for word in query_words:
             if word in ["AND", "NOT", 'OR']:
                 bool_operations.append(word)
