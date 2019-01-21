@@ -99,7 +99,7 @@ class BooleanIndex(Index):
                                 self.terms_to_id[term], doc_id] = 1  # +=1 if we want to count the frequency of the term
             print("Saving block " + str(block_id))
             block_inc_matrix = block_inc_matrix.tocsc()
-            save_npz("block_inc_matrix" + str(block_id) + ".npz", block_inc_matrix)
+            save_npz(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
 
     def load_cs276_index(self):
         """
@@ -110,7 +110,7 @@ class BooleanIndex(Index):
         nb_docs = 98998
         self.incidence_matrix = lil_matrix((nb_terms, nb_docs))
         for block_id in range(10):
-            self.incidence_matrix += np.load("block_inc_matrix" + str(block_id) + ".npz")
+            self.incidence_matrix += np.load(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"))
         self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
 
     def create_bool_tree(self, query: list, left_op:Operator, node_id) -> Operator:  # returns a tree of operations, given by its root
