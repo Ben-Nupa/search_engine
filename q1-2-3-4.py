@@ -6,12 +6,74 @@ import sys
 from math import log
 import numpy as np
 import matplotlib.pyplot as plt
-import os
+from time import time
     
-if __name__ == "__main__":
-    filename = os.path.join('data', 'CACM', 'cacm.all')
     
-    raw = np.loadtxt(filename, dtype=str, delimiter="someneverhappeningstr")
+    
+def text_preprocessing(text):
+    text.replace(" ", " ")
+    text.replace(";", " ")
+    text.replace(",", " ")
+    text.replace(".", " ")
+    text.replace("-", " ")
+    text.replace("_", " ")
+    text.replace("\"", " ")
+    text.replace("\'", " ")
+    text.replace("!", " ")
+    text.replace("?", " ")
+    text.replace("[", " ")
+    text.replace("]", " ")
+    text.replace("(", " ")
+    text.replace(")", " ")
+    text.replace("#", " ")
+    text.lower()
+    return text.split(" ")
+    
+    
+
+def BSBI():
+    """
+    doit retourner :
+    un dictionnaire (token:token_id)
+    un dictionnaire (token_id:[liste de (doc_id, nb_occ)])
+    optionnel : un dictionnaire (doc_id:[liste de booleen qui indique si le terme i est présent])
+    """
+    raw = np.loadtxt("cacm.all", dtype=str, delimiter="someneverhappeningstr")
+    keep = False
+    
+    max_tok_id = 0
+    tok2id = {}
+    doc_id = 0
+    tokdoc = {}
+    
+    V = 0  # nb of distinct words in total data
+    T = 0  # nb of tokens in total data
+    
+    for row in raw:
+        if row.startswith(".") :
+            if row.startswith(".I"):
+                doc_id += 1 # assumption : docs are read in order
+                
+            keep = row.startswith(".T") or row.startswith(".W") or row.startswith(".K")
+                
+        elif keep:
+            terms = text_preprocessing(row)
+            
+            for term in terms :
+                if term != "":
+                    if term not in tok2id:
+                        tok2id[term] = max_tok_id
+                        max_tok_id += 1
+                        tokdoc[term] = [0 for i in range(doc_id)] # the token was never seen before in the preceeding docs
+                    if term not in term_dic:
+                        term_dic[term] = 0
+                    term_dic[term] += 1
+    
+    
+    
+    
+def analysis():
+    raw = np.loadtxt("cacm.all", dtype=str, delimiter="someneverhappeningstr")
     keep = False
     
     term_dic = {}
@@ -43,13 +105,8 @@ if __name__ == "__main__":
             else :
                 keep = False
         elif keep:
-            row = row.lower()
-            row.replace("; ", " ")
-            row.replace(", ", " ")
-            row.replace("(", "")
-            row.replace(")", "")
+            terms = text_preprocessing(row)
             
-            terms = row.split(" ")  # TODO must split along other word sep too
             for term in terms :
                 if term != "":
                     if term not in term_dic:
@@ -73,14 +130,32 @@ if __name__ == "__main__":
     
     print("If the data had 1M tokens, it would have roughly {} distinct words".format(int(k*1e6**b)))
     
+    s = time()
+    print("Sorting the frequencies...")
     term_list = sorted(term_dic.items(), key=lambda x: x[1], reverse=True)
+    print("Done ! {:.2f}s".format(time()-s))
+    
     print(term_list[0])
     print(term_list[-1])
+    words = [w for w,f in term_list]
+    freq = [f for w,f in term_list]
+    rank = [i for i in range(len(freq))]
+    logrank = [log(i+1) for i in range(len(freq))]
+    logfreq = [log(f+1) for w,f in term_list]
+
+    plt.figure(1)
+    plt.subplot(211)
+    plt.plot(rank, freq)
+    plt.ylabel("word frequency")
+    plt.xlabel("rank")
+
+    plt.subplot(212)
+    plt.plot(logrank, logfreq)
+    plt.ylabel("log word frequency")
+    plt.xlabel("log rank")
+    plt.show()
     
     
-    
-    
-    
-    
-    
-    
+if __name__ == "__main__":
+    analysis()
+    BSBI()
