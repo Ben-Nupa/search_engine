@@ -93,14 +93,13 @@ class BooleanIndex(Index):
                                 self.terms_to_id[term] = term_id
                                 self.id_to_term[term_id] = term
                             self.incidence_matrix[self.terms_to_id[term], doc_id] += 1
-
         self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
 
     def treat_query(self, query: str) -> np.array:
         print(query)
         query_words = query.split()
         bool_operations = []
-        bool_terms = []
+        bool_terms = []<
         for word in query_words:
             if word in ["AND", "NOT", 'OR']:
                 bool_operations.append(word)
