@@ -34,6 +34,9 @@ class Index:
     def build_cacm(self, filename: str):
         raise NotImplementedError
 
+    def build_cs276(self, directory_name: str):
+        raise NotImplementedError
+
     def treat_query(self, query: str) -> List[str]:
         raise NotImplementedError
 
