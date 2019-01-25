@@ -4,8 +4,6 @@ import os
 import pickle
 from math import log
 import matplotlib.pyplot as plt
-import numpy as np
-from scipy import sparse
 
 #======================================FIRST PART : TOKENIZATION================================================================
 
@@ -84,6 +82,7 @@ print("Question 3 : Heaps Law : k = {} and b = {}".format(k,b))
 print("Question 4 : For 1 million tokens, the vocabulary size would be {}".format(int(k*1e6**b)))
 
 #Question5
+print("Question 5")
 frequencies = sorted(tokens.values(),reverse=True)
 ranks = [i+1 for i in range(len(frequencies))]
 fig = plt.figure()
@@ -100,55 +99,3 @@ ax2.set_xlabel("Rang")
 ax2.set_ylabel("Fréquence")
 ax2.set_title("Graphe fréquence vs rang (echelle log)")
 plt.show()
-
-#======================================SECOND PART : INDEX================================================================
-
-def create_term_ids(tokens) :
-    """Return a dictionary term_id/term using the dictionary of tokens"""
-    terms = tokens.copy()
-    term_ids = dict()
-    i = 0
-    for word,count in terms.items() :
-        term_ids[word] = i
-        i = i+1
-    return term_ids
-
-def create_doc_ids(directory) :
-    """Return a dictionary doc_ids/doc in the specified directory"""
-    list_files = os.listdir(directory)
-    doc_ids = dict()
-    i = 0
-    for doc in list_files:
-        doc_ids[doc] = i
-        i = i+1
-    return doc_ids
-
-def create_term_doc_matrix(directory,term_ids,doc_ids) :
-    """Return a sparse matrix containing pair of term_ids and doc_ids"""
-    terms = []
-    docs = []
-    count = []
-    listFiles = os.listdir(directory)
-    for fileName in listFiles:
-        file = open(os.path.join(directory, fileName), "r")
-        tokens_in_file = dict() #Temporary dictionnary to count the frequency of each token in the document
-        content = file.readlines()
-        for line in content:
-            words = line.split(" ")
-            for word in words:
-                if word not in common_words:
-                    tokens_in_file[word] = tokens_in_file.get(word, 0) + 1
-                    terms.append(term_ids[word])
-                    docs.append(doc_ids[fileName])
-                    count.append(tokens_in_file[word])
-    terms = np.array(terms)
-    docs = np.array(docs)
-    count = np.array(count)
-    matrix_term_doc = sparse.coo_matrix((count,(terms,docs)))
-    return matrix_term_doc
-
-
-term_ids = create_term_ids(tokens)
-directory = os.path.join("..", "pa1-data", "pa1-data", str(1))
-doc_ids = create_doc_ids(directory)
-#matrix = create_term_doc_matrix(directory,term_ids,doc_ids)

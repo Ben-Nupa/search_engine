@@ -2,7 +2,7 @@ import os
 import sys
 from typing import List
 import numpy as np
-from scipy.sparse import lil_matrix, csc_matrix
+from scipy.sparse import lil_matrix, csc_matrix, load_npz, save_npz
 from index import Index
 from tree_operator import Node
 from tree_operator import get_prios
@@ -116,10 +116,10 @@ class BooleanIndex(Index):
         """
         nb_terms = 353975
         nb_docs = 98998
-        self.incidence_matrix = lil_matrix((nb_terms, nb_docs))
+        self.incidence_matrix = csc_matrix((nb_terms, nb_docs))
         for block_id in range(10):
-            self.incidence_matrix += np.load(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"))
-        self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
+            self.incidence_matrix += load_npz(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"))
+        self.incidence_matrix = self.incidence_matrix.tocsr()  # Faster column slicing
 
 
     def compute_bool_result(self, op):  
