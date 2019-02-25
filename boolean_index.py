@@ -233,7 +233,6 @@ if __name__ == '__main__':
     index = BooleanIndex()
     print("Index declared... {:.2f}s".format(time()-start))
     start = time()
-    index.build_cs276(os.path.join("..","..","pa1-data","pa1-data"))
     #index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
     index.load_cs276_index()
     print("Index built ! {:.2f}s".format(time()-start))
