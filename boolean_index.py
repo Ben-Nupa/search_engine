@@ -109,17 +109,17 @@ class BooleanIndex(Index):
                                 self.terms_to_id[term], doc_id] = 1  # +=1 if we want to count the frequency of the term
             print("Saving block " + str(block_id))
             block_inc_matrix = block_inc_matrix.tocsc()
-            save_npz(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
+            save_npz(os.path.join("CS276_boolean_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
 
         #Saving the four dictionaries
         print("Saving dictionaries")
-        with open('doc_to_id.pkl', 'wb') as output_doc_to_id :
+        with open(os.path.join("CS276_boolean_index",'doc_to_id.pkl'), 'wb') as output_doc_to_id :
             pickle.dump(self.doc_to_id, output_doc_to_id)
-        with open('id_to_doc.pkl', 'wb') as output_id_to_doc :
+        with open(os.path.join("CS276_boolean_index",'id_to_doc.pkl'), 'wb') as output_id_to_doc :
             pickle.dump(self.id_to_doc, output_id_to_doc)
-        with open('id_to_term.pkl', 'wb') as output_id_to_term :
+        with open(os.path.join("CS276_boolean_index",'id_to_term.pkl'), 'wb') as output_id_to_term :
             pickle.dump(self.id_to_term, output_id_to_term)
-        with open('term_to_id.pkl', 'wb') as output_term_to_id :
+        with open(os.path.join("CS276_boolean_index",'term_to_id.pkl'), 'wb') as output_term_to_id :
             pickle.dump(self.terms_to_id, output_term_to_id)
 
     def load_cs276_index(self):
@@ -132,18 +132,18 @@ class BooleanIndex(Index):
         print("Loading index matrices")
         self.incidence_matrix = csc_matrix((nb_terms, nb_docs))
         for block_id in range(10):
-            self.incidence_matrix += load_npz(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"))
+            self.incidence_matrix += load_npz(os.path.join("CS276_boolean_index","block_inc_matrix" + str(block_id) + ".npz"))
         self.incidence_matrix = self.incidence_matrix.tocsr()
 
-        #Loading the four dicitonaries
+        #Loading the four dictionaries
         print("Loading dictionaries")
-        with open('doc_to_id.pkl', 'rb') as input_doc_to_id :
+        with open(os.path.join("CS276_boolean_index",'doc_to_id.pkl'), 'rb') as input_doc_to_id :
             self.doc_to_id = pickle.load(input_doc_to_id)
-        with open('id_to_doc.pkl', 'rb') as input_id_to_doc :
+        with open(os.path.join("CS276_boolean_index",'id_to_doc.pkl'), 'rb') as input_id_to_doc :
             self.id_to_doc = pickle.load(input_id_to_doc)
-        with open('id_to_term.pkl', 'rb') as input_id_to_term :
+        with open(os.path.join("CS276_boolean_index",'id_to_term.pkl'), 'rb') as input_id_to_term :
             self.id_to_term = pickle.load(input_id_to_term)
-        with open('term_to_id.pkl', 'rb') as input_term_to_id :
+        with open(os.path.join("CS276_boolean_index",'term_to_id.pkl'), 'rb') as input_term_to_id :
             self.terms_to_id = pickle.load(input_term_to_id)
 
 
