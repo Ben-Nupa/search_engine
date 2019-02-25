@@ -13,6 +13,8 @@ from tree_operator import get_tree_rep
 from tree_operator import str2list
 from tree_operator import remove_par
 
+from tqdm import tqdm
+
 from time import time
 
 
@@ -75,6 +77,11 @@ class BooleanIndex(Index):
         Args :
             directory_name : String containing the path to the CS276 dataset (pa1-data)
         """
+
+        # Creating directory if not existing :
+        if not os.path.exists(os.path.join("CS276_boolean_index")):
+            os.makedirs(os.path.join("CS276_boolean_index"))
+
         doc_id = -1
         term_id = -1
 
@@ -84,9 +91,8 @@ class BooleanIndex(Index):
         for block_id in range(10):
             list_of_files = os.listdir(os.path.join(directory_name, str(block_id)))
             block_inc_matrix = lil_matrix((nb_terms, nb_docs))
-            for file_id in range(len(list_of_files)):
-                if file_id % 100 == 0:
-                    print("Completed {} % of block {}...".format(int(100 * file_id / len(list_of_files)), block_id))
+            print("Building index for block {}:".format(block_id))
+            for file_id in tqdm(range(len(list_of_files))):
                 # Reading the document
                 file = open(os.path.join(directory_name, str(block_id), list_of_files[file_id]), "r")
                 content = file.readlines()
@@ -227,7 +233,7 @@ if __name__ == '__main__':
     index = BooleanIndex()
     print("Index declared... {:.2f}s".format(time()-start))
     start = time()
-    #index.build_cs276(os.path.join("..","..","pa1-data","pa1-data"))
+    index.build_cs276(os.path.join("..","..","pa1-data","pa1-data"))
     #index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
     index.load_cs276_index()
     print("Index built ! {:.2f}s".format(time()-start))
