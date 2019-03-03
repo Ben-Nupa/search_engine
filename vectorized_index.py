@@ -2,10 +2,10 @@ import os
 import time
 from typing import List
 import numpy as np
-from scipy.sparse import lil_matrix, csc_matrix, csr_matrix
+from scipy.sparse import lil_matrix, csc_matrix, save_npz
 from scipy.sparse.linalg import norm as sparse_norm
 from index import Index
-
+import pickle
 
 class VectorizedIndex(Index):
     def __init__(self):
@@ -88,6 +88,84 @@ class VectorizedIndex(Index):
         # Add last doc
         self.doc_to_id[str(doc_id + 1) + ' -' + title] = doc_id
         self.id_to_doc[doc_id] = str(doc_id + 1) + ' -' + title
+
+    def build_cs276(self, directory_name: str):
+        """
+        Uses the CS276 (Stanford) collection to build vectorial_index and saves it npz files
+
+        Args :
+            directory_name : String containing the path to the CS276 dataset (pa1-data)
+        """
+        doc_id = -1
+        term_id = -1
+
+        nb_terms = 353975
+        nb_docs = 98998
+
+        for block_id in range(10):
+            list_of_files = os.listdir(os.path.join(directory_name, str(block_id)))
+            block_inc_matrix = lil_matrix((nb_terms, nb_docs))
+            for file_id in range(len(list_of_files)):
+                if file_id % 100 == 0:
+                    print("Completed {} % of block {}...".format(int(100 * file_id / len(list_of_files)), block_id))
+                # Reading the document
+                file = open(os.path.join(directory_name, str(block_id), list_of_files[file_id]), "r")
+                content = file.readlines()
+                file.close()
+                # Adding the document to both doc_to_id and id_to_doc dictionaries
+                doc_id += 1
+                doc = os.path.join(str(block_id), list_of_files[file_id])
+                self.doc_to_id[doc] = doc_id
+                self.id_to_doc[doc_id] = doc
+                # Counting the terms
+                for line in content:
+                    terms = self.normalize(line) # Normalizing (Removing common words and filtering)
+                    for term in terms:
+                        if term != "":
+                            if term not in self.terms_to_id.keys(): # Adding a new term to the list if not done yet
+                                term_id += 1
+                                self.terms_to_id[term] = term_id
+                                self.id_to_term[term_id] = term
+                            # Incrementing the counter of this term
+                            block_inc_matrix[
+                                self.terms_to_id[term], doc_id] += 1  # ==1 if we wanted to create the boolean index
+
+            print("Saving block " + str(block_id))
+            block_inc_matrix = block_inc_matrix.tocsc()
+            save_npz(os.path.join("CS276_vec_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
+
+            # Saving the four dictionaries
+            print("Saving dictionaries")
+            with open(os.path.join("CS276_boolean_index", 'doc_to_id.pkl'), 'wb') as output_doc_to_id:
+                pickle.dump(self.doc_to_id, output_doc_to_id)
+            with open(os.path.join("CS276_boolean_index", 'id_to_doc.pkl'), 'wb') as output_id_to_doc:
+                pickle.dump(self.id_to_doc, output_id_to_doc)
+            with open(os.path.join("CS276_boolean_index", 'id_to_term.pkl'), 'wb') as output_id_to_term:
+                pickle.dump(self.id_to_term, output_id_to_term)
+            with open(os.path.join("CS276_boolean_index", 'term_to_id.pkl'), 'wb') as output_term_to_id:
+                pickle.dump(self.terms_to_id, output_term_to_id)
+
+            # Compute and store IDF (for queries)
+            self.idf_vector = np.zeros((nb_terms, 1))
+            for i, row in enumerate(self.incidence_matrix):
+                nb_doc_with_term = len(row.nonzero()[0])
+                self.idf_vector[i, 0] = np.log(nb_docs / nb_doc_with_term)
+
+            # Add IDF to incidence matrix and normalize it
+            computation_version = 3  # 3 is faster
+            if computation_version == 1:  # for loop
+                for j in range(nb_docs):
+                    self.incidence_matrix[:, j] = self.incidence_matrix[:, j].multiply(self.idf_vector)
+            elif computation_version == 2:  # double inverse
+                self.incidence_matrix = csc_matrix(self.incidence_matrix / (1 / self.idf_vector))
+            elif computation_version == 3:  # using whole matrix
+                temp_matrix = np.ones(self.incidence_matrix.shape) * self.idf_vector
+                self.incidence_matrix = self.incidence_matrix.multiply(temp_matrix)
+
+            self.idf_vector = self.idf_vector.T  # Useful for query treat
+
+            # Normalize
+            self.incidence_matrix /= sparse_norm(self.incidence_matrix, axis=0)
 
     def _build_tf_idf_vector(self, terms: list) -> csc_matrix:
         vector = lil_matrix((1, self.incidence_matrix.shape[0]))

@@ -3,6 +3,8 @@ import sys
 from typing import List
 import numpy as np
 from scipy.sparse import lil_matrix, csc_matrix, load_npz, save_npz
+import pickle
+
 from index import Index
 from tree_operator import Node
 from tree_operator import get_prios
@@ -10,6 +12,8 @@ from tree_operator import split2tree
 from tree_operator import get_tree_rep
 from tree_operator import str2list
 from tree_operator import remove_par
+
+from tqdm import tqdm
 
 from time import time
 
@@ -73,6 +77,11 @@ class BooleanIndex(Index):
         Args :
             directory_name : String containing the path to the CS276 dataset (pa1-data)
         """
+
+        # Creating directory if not existing :
+        if not os.path.exists(os.path.join("CS276_boolean_index")):
+            os.makedirs(os.path.join("CS276_boolean_index"))
+
         doc_id = -1
         term_id = -1
 
@@ -82,9 +91,8 @@ class BooleanIndex(Index):
         for block_id in range(10):
             list_of_files = os.listdir(os.path.join(directory_name, str(block_id)))
             block_inc_matrix = lil_matrix((nb_terms, nb_docs))
-            for file_id in range(len(list_of_files)):
-                if file_id % 100 == 0:
-                    print("Completed {} % of block {}...".format(int(100 * file_id / len(list_of_files)), block_id))
+            print("Building index for block {}:".format(block_id))
+            for file_id in tqdm(range(len(list_of_files))):
                 # Reading the document
                 file = open(os.path.join(directory_name, str(block_id), list_of_files[file_id]), "r")
                 content = file.readlines()
@@ -107,7 +115,18 @@ class BooleanIndex(Index):
                                 self.terms_to_id[term], doc_id] = 1  # +=1 if we want to count the frequency of the term
             print("Saving block " + str(block_id))
             block_inc_matrix = block_inc_matrix.tocsc()
-            save_npz(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
+            save_npz(os.path.join("CS276_boolean_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
+
+        #Saving the four dictionaries
+        print("Saving dictionaries")
+        with open(os.path.join("CS276_boolean_index",'doc_to_id.pkl'), 'wb') as output_doc_to_id :
+            pickle.dump(self.doc_to_id, output_doc_to_id)
+        with open(os.path.join("CS276_boolean_index",'id_to_doc.pkl'), 'wb') as output_id_to_doc :
+            pickle.dump(self.id_to_doc, output_id_to_doc)
+        with open(os.path.join("CS276_boolean_index",'id_to_term.pkl'), 'wb') as output_id_to_term :
+            pickle.dump(self.id_to_term, output_id_to_term)
+        with open(os.path.join("CS276_boolean_index",'term_to_id.pkl'), 'wb') as output_term_to_id :
+            pickle.dump(self.terms_to_id, output_term_to_id)
 
     def load_cs276_index(self):
         """
@@ -116,10 +135,22 @@ class BooleanIndex(Index):
         """
         nb_terms = 353975
         nb_docs = 98998
+        print("Loading index matrices")
         self.incidence_matrix = csc_matrix((nb_terms, nb_docs))
         for block_id in range(10):
-            self.incidence_matrix += load_npz(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"))
-        self.incidence_matrix = self.incidence_matrix.tocsr()  # Faster column slicing
+            self.incidence_matrix += load_npz(os.path.join("CS276_boolean_index","block_inc_matrix" + str(block_id) + ".npz"))
+        self.incidence_matrix = self.incidence_matrix.tocsr()
+
+        #Loading the four dictionaries
+        print("Loading dictionaries")
+        with open(os.path.join("CS276_boolean_index",'doc_to_id.pkl'), 'rb') as input_doc_to_id :
+            self.doc_to_id = pickle.load(input_doc_to_id)
+        with open(os.path.join("CS276_boolean_index",'id_to_doc.pkl'), 'rb') as input_id_to_doc :
+            self.id_to_doc = pickle.load(input_id_to_doc)
+        with open(os.path.join("CS276_boolean_index",'id_to_term.pkl'), 'rb') as input_id_to_term :
+            self.id_to_term = pickle.load(input_id_to_term)
+        with open(os.path.join("CS276_boolean_index",'term_to_id.pkl'), 'rb') as input_term_to_id :
+            self.terms_to_id = pickle.load(input_term_to_id)
 
 
     def compute_bool_result(self, op):  
@@ -202,7 +233,8 @@ if __name__ == '__main__':
     index = BooleanIndex()
     print("Index declared... {:.2f}s".format(time()-start))
     start = time()
-    index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
+    #index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
+    index.load_cs276_index()
     print("Index built ! {:.2f}s".format(time()-start))
 
     result = index.treat_query('Assistant OR program')
