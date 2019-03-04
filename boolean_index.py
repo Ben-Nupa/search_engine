@@ -1,10 +1,22 @@
 import os
+import sys
 from typing import List
 import numpy as np
-from scipy.sparse import lil_matrix, csc_matrix
+from scipy.sparse import lil_matrix, csc_matrix, load_npz, save_npz
+import pickle
+
 from index import Index
-from tree_operator import Operator
-from tree_operator import draw
+from tree_operator import Node
+from tree_operator import get_prios
+from tree_operator import split2tree
+from tree_operator import get_tree_rep
+from tree_operator import str2list
+from tree_operator import remove_par
+
+from tqdm import tqdm
+
+from time import time
+
 
 class BooleanIndex(Index):
     def build_cacm(self, filename: str):
@@ -20,7 +32,7 @@ class BooleanIndex(Index):
 
         nb_terms = 5462
         nb_docs = 3204
-        self.incidence_matrix = lil_matrix((nb_terms, nb_docs), dtype=bool)  # Boolean index
+        self.incidence_matrix = lil_matrix((nb_terms, nb_docs), dtype=int)  # Boolean index
 
         for line in raw_file:
             if line.startswith("."):
@@ -50,7 +62,7 @@ class BooleanIndex(Index):
                             term_id += 1
                             self.terms_to_id[term] = term_id
                             self.id_to_term[term_id] = term
-                        self.incidence_matrix[self.terms_to_id[term], doc_id] = True  # Boolean index
+                        self.incidence_matrix[self.terms_to_id[term], doc_id] = 1  # Boolean index
 
         # Add last doc
         self.doc_to_id[str(doc_id + 1) + ' -' + title] = doc_id
@@ -65,6 +77,11 @@ class BooleanIndex(Index):
         Args :
             directory_name : String containing the path to the CS276 dataset (pa1-data)
         """
+
+        # Creating directory if not existing :
+        if not os.path.exists(os.path.join("CS276_boolean_index")):
+            os.makedirs(os.path.join("CS276_boolean_index"))
+
         doc_id = -1
         term_id = -1
 
@@ -74,9 +91,8 @@ class BooleanIndex(Index):
         for block_id in range(10):
             list_of_files = os.listdir(os.path.join(directory_name, str(block_id)))
             block_inc_matrix = lil_matrix((nb_terms, nb_docs))
-            for file_id in range(len(list_of_files)):
-                if file_id % 100 == 0:
-                    print("Completed {} % of block {}...".format(int(100 * file_id / len(list_of_files)), block_id))
+            print("Building index for block {}:".format(block_id))
+            for file_id in tqdm(range(len(list_of_files))):
                 # Reading the document
                 file = open(os.path.join(directory_name, str(block_id), list_of_files[file_id]), "r")
                 content = file.readlines()
@@ -99,7 +115,18 @@ class BooleanIndex(Index):
                                 self.terms_to_id[term], doc_id] = 1  # +=1 if we want to count the frequency of the term
             print("Saving block " + str(block_id))
             block_inc_matrix = block_inc_matrix.tocsc()
-            save_npz(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
+            save_npz(os.path.join("CS276_boolean_index","block_inc_matrix" + str(block_id) + ".npz"), block_inc_matrix)
+
+        #Saving the four dictionaries
+        print("Saving dictionaries")
+        with open(os.path.join("CS276_boolean_index",'doc_to_id.pkl'), 'wb') as output_doc_to_id :
+            pickle.dump(self.doc_to_id, output_doc_to_id)
+        with open(os.path.join("CS276_boolean_index",'id_to_doc.pkl'), 'wb') as output_id_to_doc :
+            pickle.dump(self.id_to_doc, output_id_to_doc)
+        with open(os.path.join("CS276_boolean_index",'id_to_term.pkl'), 'wb') as output_id_to_term :
+            pickle.dump(self.id_to_term, output_id_to_term)
+        with open(os.path.join("CS276_boolean_index",'term_to_id.pkl'), 'wb') as output_term_to_id :
+            pickle.dump(self.terms_to_id, output_term_to_id)
 
     def load_cs276_index(self):
         """
@@ -108,66 +135,108 @@ class BooleanIndex(Index):
         """
         nb_terms = 353975
         nb_docs = 98998
-        self.incidence_matrix = lil_matrix((nb_terms, nb_docs))
+        print("Loading index matrices")
+        self.incidence_matrix = csc_matrix((nb_terms, nb_docs))
         for block_id in range(10):
-            self.incidence_matrix += np.load(os.path.join("CS276_index","block_inc_matrix" + str(block_id) + ".npz"))
-        self.incidence_matrix = self.incidence_matrix.tocsc()  # Faster column slicing
+            self.incidence_matrix += load_npz(os.path.join("CS276_boolean_index","block_inc_matrix" + str(block_id) + ".npz"))
+        self.incidence_matrix = self.incidence_matrix.tocsr()
 
-    def create_bool_tree(self, query: list, left_op:Operator, node_id) -> Operator:  # returns a tree of operations, given by its root
-        print("Function called : ", query, left_op, node_id)
-        node_id += 1
-        my_node_id = node_id
-        if len(query) > 0:
-            word = query.pop(0)
-            if word in ["AND", "NOT", 'OR']:
-                if (word == "AND" or word == "OR") and left_op is None:
-                    raise ValueError("Query was ill formulated. Please specify a term before an operation \"AND\" or \"OR\"")
-                tree_dic[my_node_id] = Operator(keyword=word, left=left_op, right=self.create_bool_tree(query, None, node_id))                
+        #Loading the four dictionaries
+        print("Loading dictionaries")
+        with open(os.path.join("CS276_boolean_index",'doc_to_id.pkl'), 'rb') as input_doc_to_id :
+            self.doc_to_id = pickle.load(input_doc_to_id)
+        with open(os.path.join("CS276_boolean_index",'id_to_doc.pkl'), 'rb') as input_id_to_doc :
+            self.id_to_doc = pickle.load(input_id_to_doc)
+        with open(os.path.join("CS276_boolean_index",'id_to_term.pkl'), 'rb') as input_id_to_term :
+            self.id_to_term = pickle.load(input_id_to_term)
+        with open(os.path.join("CS276_boolean_index",'term_to_id.pkl'), 'rb') as input_term_to_id :
+            self.terms_to_id = pickle.load(input_term_to_id)
 
-            else:
-                if left_op is not None:
-                    raise ValueError("Query was ill formulated : Two words without an operator in-between")
-                term = self.normalize(word)[0]
-                if term != "":
-                    token_id = self.terms_to_id[term]  # Get the corresponding id
-                    tree_dic[my_node_id] = self.create_bool_tree(query, left_op=Operator(token_id=token_id), node_id=node_id)
-                else:
-                    raise ValueError("empty word detected") 
-            print("{}. Word : {} - Op : {}".format(my_node_id, word, tree_dic[my_node_id]))
-            return tree_dic[my_node_id]
-        else:
-            print("Reached end of query")
-            return left_op       
-            
-    def treat_query(self, query: str) -> Operator:
-        print(query)
-        query_words = query.split(" ")
-        print(query_words)
-        return self.create_bool_tree(query_words, None, 0)
-          
-    def compute_bool_result(self, op):  # recursive function to compute the result of a tree given its root
-        if hasattr(op, 'token_id'):
-            return self.incidence_matrix[op.token_id]
-        else:
-            if op.keyword == "OR":
-                return self.compute_bool_result(op.left) + self.compute_bool_result(op.right)
-            if op.keyword == "AND":
-                return self.compute_bool_result(op.left).multiply(self.compute_bool_result(op.right))
-            if op.keyword == "NOT":
-                return 1 - self.compute_bool_result(op.right)                
+
+    def compute_bool_result(self, op):  
+        """
+        Recursive function to compute the result of a tree given its root
         
+        Returns a list of postings and a boolean indicating whether 
+        it is a positive list (the result is the list) 
+        or a negative list (the result is all docs EXCEPT those in the list)
+        """
+        if op.keyword == "OR":
+            left_result, left_pos = self.compute_bool_result(op.left)
+            right_result, right_pos = self.compute_bool_result(op.right)
+            if left_pos and right_pos:
+                return (left_result + right_result).sign(), True
+            elif not left_pos and not right_pos:
+                return left_result.multiply(right_result), False
+            elif left_pos and not right_pos:
+                return (right_result-left_result > 0 ).astype(int), False  # you are encouraged to check yourself this formula works
+            elif not left_pos and right_pos:
+                return (left_result-right_result > 0 ).astype(int), False  # you are encouraged to check yourself this formula works           
+             
+        elif op.keyword == "AND":
+            left_result, left_pos = self.compute_bool_result(op.left)
+            right_result, right_pos = self.compute_bool_result(op.right)
+            if left_pos and right_pos:
+                return left_result.multiply(right_result), True
+            elif not left_pos and not right_pos:
+                return (left_result + right_result).sign(), False
+            elif left_pos and not right_pos:
+                return (left_result-right_result> 0 ).astype(int), False  # you are encouraged to check yourself this formula works
+            elif not left_pos and right_pos:
+                return (right_result-left_result > 0 ).astype(int), False # you are encouraged to check yourself this formula works           
+                            
+        elif op.keyword == "NOT":
+            right_result, right_pos = self.compute_bool_result(op.right)        
+            return right_result, not right_pos
+        else:
+            return self.incidence_matrix[self.terms_to_id[op.keyword]], True
         
-if __name__ == '__main__':
+
+    def treat_query(self, query: str):
+        
+        query_list = str2list(query)
+        query_words = remove_par(query_list)
+        for i in range(len(query_words)):
+            if query_words[i] not in ["AND", "OR", "NOT"]:
+                query_words[i] = self.normalize(query_words[i])[0]
+        print("query : {}".format(query_list))
+        print("Creating query tree...")
+        start = time()
+        
+        prios, _ = get_prios(query_list, 0, 0)
+        tree = split2tree(query_words, prios)
+
+        print("Tree declared ! {:.2f} s".format(time()-start))
+        print(get_tree_rep([tree], ""))
+
+        print("Computing query result...")
+        start = time()
+        result, pos_list = self.compute_bool_result(tree)
+        print("Done ! {:.2f}s".format(time()-start))
+        
+        if pos_list:
+            return result
+        else:
+            ones = np.ones(result.shape, dtype=int)
+            return ones - result
     
+    
+    def input_query(self):
+        query = input("Enter a boolean query : \n(Example : NOT Assistant OR program AND paper)")
+        return self.treat_query(query)    
+    
+    
+if __name__ == '__main__':
     PATH_TO_DATA = 'data'
     print("Creating index...")
+    start = time()
     index = BooleanIndex()
-    index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
-    tree_dic = {}
-    tree = index.treat_query('Assistant OR program')
-    print("word 'program' found in the following docs :")
-    print(index.incidence_matrix[14])
-    print("____________________________________________")
-    print(index.compute_bool_result(tree))
-    
-    
+    print("Index declared... {:.2f}s".format(time()-start))
+    start = time()
+    #index.build_cacm(os.path.join(PATH_TO_DATA, 'CACM', 'cacm.all'))
+    index.load_cs276_index()
+    print("Index built ! {:.2f}s".format(time()-start))
+
+    result = index.treat_query('Assistant OR program')
+    result = index.treat_query('Assistant OR program AND NOT tendency AND minimum AND successful')
+    print("result : {}".format(result))
