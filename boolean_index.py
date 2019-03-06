@@ -238,5 +238,5 @@ if __name__ == '__main__':
     print("Index built ! {:.2f}s".format(time()-start))
 
     result = index.treat_query('Assistant OR program')
-    result = index.treat_query('Assistant OR program AND NOT tendency AND minimum AND successful')
+    result = index.treat_query('Assistant OR (program AND NOT tendency AND minimum AND successful)')
     print("result : {}".format(result))
