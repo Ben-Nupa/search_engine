@@ -190,9 +190,10 @@ def plot_precision_recall_curve(pred: np.ndarray, true):
     plt.title('Precision-recall curve')
 
 
-# if __name__ == '__main__':
-#     pred = np.arange(14)
-#     true = [0, 1, 3, 5, 12, 50]
-#
-#     plot_precision_recall_curve(pred, true)
-#     plt.show()
+if __name__ == '__main__':
+    pred = np.arange(14)
+    true = [0, 1, 3, 5, 12, 50]
+    # true = np.array([131,4334,53442,434])
+    print(compute_mean_average_precision(pred,true))
+    plot_precision_recall_curve(pred, true)
+    plt.show()
