@@ -1,7 +1,6 @@
 import numpy as np
 import re
-
-class Node:
+class Node():
     """
     Node class for a tree representing a boolean query.
     Each node is an operation, each leaf is a token_id
@@ -10,12 +9,12 @@ class Node:
     def __init__(self, keyword, left=None, right=None):
         self.keyword = keyword
         
-        if keyword in ["NOT", "AND", "OR"]:
+        if keyword in ["not", "and", "or"]:
             
             if right is None:
                 raise ArgumentError("no right subtree for this operator")
             self.right = right
-            if keyword == "OR" or keyword == "AND":
+            if keyword == "or" or keyword == "and":
                 if left is None:
                     raise ArgumentError("no left subtree for an operator of arity 2")
                 self.left = left
@@ -27,33 +26,21 @@ class Node:
     def __str__(self):
         return self.__repr__()
 
+    def print_tree(self, depth):
+        print("\t"*depth + str(self))
+        if hasattr(self, "left"):
+            self.left.print_tree(depth+1)
+        if hasattr(self, "right"):
+            self.right.print_tree(depth+1)
         
-
-def get_tree_rep(ops:list, drawing:str):
-    """
-    Get a string representing the subtree given by its root.
-    Indentation is messy : the first 2 nodes of each line are the left and right 
-    """
-    line = ""
-    line_null = True
-    next_line = []
-    for op in ops:
-        if op is None:
-            line += "_\t"
-        else:
-            line_null = False
-            line += str(op) + "\t"
-        next_line += [None if not hasattr(op, "left") else op.left,
-                      None if not hasattr(op, "right") else op.right]    
-    line += "\n"
-    if line_null:
-        return drawing
-    else:
-        return get_tree_rep(next_line, drawing+line)
-
 def str2list(query):
+    """
+    :param query: query as a string with keywords, parenthesis and boolean operators
+    :returns: query as a list for processing
+    """
     query = query.replace("(", " ( ")
     query = query.replace(")", " ) ")
+    query = query.lower()
     query = re.sub("\s+", " ", query)
     if query.startswith(" "):
         query = query[1:]
@@ -78,17 +65,17 @@ def get_prios(query_list, prio, k):
     while k < len(query_list):
         w = query_list[k]
         if w == "(":
-            subtree, k = first_pass_prio(query_list, prio+4, k+1)
+            subtree, k = get_prios(query_list, prio+4, k+1)
             prios += subtree
         elif w == ")":
             return prios, k+1
-        elif w == "AND" :
+        elif w == "and" :
             prios += [prio]
             k+=1
-        elif w == "OR" :
+        elif w == "or" :
             prios += [prio+1]
             k+=1
-        elif w == "NOT" :
+        elif w == "not" :
             prios += [prio+2]
             k+=1
         else:
@@ -104,31 +91,3 @@ def split2tree(words, prios):
     else:  
         k = np.argmin(prios)
         return Node(words[k], left=split2tree(words[:k], prios[:k]), right=split2tree(words[k+1:], prios[k+1:]))
-
-
-if __name__ == '__main__':
-    query = "NOT ((apple AND banana) OR carrot AND donkey) OR (NOT egg)"
-    
-    print("Converting to list...")
-    s = time()
-    query_list = str2list(query)
-    print("{:.2f}s".format(time()-s))
-    print(query_list)
-    
-    words = remove_par(query_list)
-    
-    print("First pass...")
-    s = time()
-    prios, _ = get_prios(query_list, 0, 0)
-    print("{:.2f}s".format(time()-s))
-    print(prios)
-    for i in range(len(words)):
-        print("{}\t-\t{}".format(words[i], prios[i]))
-    
-    print(words)
-    tree = split2tree(words, prios)
-    
-    tree_rep = get_tree_rep([tree], "")
-    print("tree rep :")
-    print(tree_rep)
-    

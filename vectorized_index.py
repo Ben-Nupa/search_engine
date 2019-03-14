@@ -1,5 +1,5 @@
 import os
-import time
+from time import time
 from typing import List
 import numpy as np
 from scipy.sparse import lil_matrix, csc_matrix, save_npz
@@ -185,7 +185,7 @@ class VectorizedIndex(Index):
         cosine_vector = self.cosine_similarity(query_vector)  # TODO: change to compute_similarity
         # Order the results by descending order of TF-IDF
         order = (-cosine_vector).argsort() + 1  # Document ID begins at 1
-        return order
+        return np.array(order)[0, :10]
 
     def cosine_similarity(self, vector: csc_matrix) -> csc_matrix:
         return vector.dot(self.incidence_matrix)

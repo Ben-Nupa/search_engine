@@ -5,7 +5,6 @@ from nltk.tokenize import word_tokenize
 from nltk.stem.porter import PorterStemmer
 from nltk.corpus import stopwords
 
-
 class Index:
     """
     Base index class.
@@ -70,7 +69,7 @@ class Index:
         sentence = sentence.replace("'ll", ' will')
         sentence = sentence.replace("'d", ' would')
         sentence = sentence.replace("-", ' ')
-
+        
         # Tokenize
         tokens = word_tokenize(sentence)
         # Convert to lower case

@@ -66,8 +66,9 @@ def BSBI(filename):
                                         range(doc_id)]  # the token was never seen before in the preceeding docs
 
 
+
 def analysis(filename):
-    raw = np.loadtxt(filename, dtype=str, delimiter="someneverhappeningstr")
+    raw = np.loadtxt(filename, dtype=str, delimiter="\n")
     keep = False
 
     term_dic = {}
@@ -99,7 +100,7 @@ def analysis(filename):
             else:
                 keep = False
         elif keep:
-            terms = Index.normalize(row)  # text_preprocessing(row)
+            terms = Index.normalize(row)
 
             for term in terms:
                 if term != "":
@@ -125,9 +126,7 @@ def analysis(filename):
     print("If the data had 1M tokens, it would have roughly {} distinct words".format(int(k * 1e6 ** b)))
 
     s = time()
-    print("Sorting the frequencies...")
     term_list = sorted(term_dic.items(), key=lambda x: x[1], reverse=True)
-    print("Done ! {:.2f}s".format(time() - s))
 
     print(term_list[0])
     print(term_list[-1])
@@ -148,6 +147,8 @@ def analysis(filename):
     plt.ylabel("log word frequency")
     plt.xlabel("log rank")
     plt.show()
+
+
 
 
 if __name__ == "__main__":

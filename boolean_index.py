@@ -6,12 +6,7 @@ from scipy.sparse import lil_matrix, csc_matrix, load_npz, save_npz
 import pickle
 
 from index import Index
-from tree_operator import Node
-from tree_operator import get_prios
-from tree_operator import split2tree
-from tree_operator import get_tree_rep
-from tree_operator import str2list
-from tree_operator import remove_par
+from tree_operator import *
 
 from tqdm import tqdm
 
@@ -23,17 +18,23 @@ class BooleanIndex(Index):
         """
         Uses the CACM collection to build the class attributes.
         """
-        raw_file = np.loadtxt(filename, dtype=str, delimiter="someneverhappeningstr")
+        raw_file = np.loadtxt(filename, dtype=str, delimiter="\n")
         keep_element = False
 
         doc_id = -1
         term_id = -1
         title = ''
 
-        nb_terms = 5462
+        nb_terms = 5462 + 2 # for the unknown words (that are in no doc) and stopwords (that are in all docs)
         nb_docs = 3204
         self.incidence_matrix = lil_matrix((nb_terms, nb_docs), dtype=int)  # Boolean index
-
+        self.terms_to_id["__UNK__"] = nb_terms-2
+        self.id_to_term[nb_terms-2] = "__UNK__"
+        self.terms_to_id["__stopword__"] = nb_terms-1
+        self.id_to_term[nb_terms-1] = "__stopword__"
+        for i in range(nb_docs):
+            self.incidence_matrix[nb_terms-1, i] = 1
+        
         for line in raw_file:
             if line.startswith("."):
                 keep_element = False
@@ -161,7 +162,7 @@ class BooleanIndex(Index):
         it is a positive list (the result is the list) 
         or a negative list (the result is all docs EXCEPT those in the list)
         """
-        if op.keyword == "OR":
+        if op.keyword == "or":
             left_result, left_pos = self.compute_bool_result(op.left)
             right_result, right_pos = self.compute_bool_result(op.right)
             if left_pos and right_pos:
@@ -173,7 +174,7 @@ class BooleanIndex(Index):
             elif not left_pos and right_pos:
                 return (left_result-right_result > 0 ).astype(int), False  # you are encouraged to check yourself this formula works           
              
-        elif op.keyword == "AND":
+        elif op.keyword == "and":
             left_result, left_pos = self.compute_bool_result(op.left)
             right_result, right_pos = self.compute_bool_result(op.right)
             if left_pos and right_pos:
@@ -185,45 +186,46 @@ class BooleanIndex(Index):
             elif not left_pos and right_pos:
                 return (right_result-left_result > 0 ).astype(int), False # you are encouraged to check yourself this formula works           
                             
-        elif op.keyword == "NOT":
+        elif op.keyword == "not":
             right_result, right_pos = self.compute_bool_result(op.right)        
             return right_result, not right_pos
         else:
             return self.incidence_matrix[self.terms_to_id[op.keyword]], True
-        
 
-    def treat_query(self, query: str):
+
+    def treat_query(self, query: str, show_tree: bool=False):
         
         query_list = str2list(query)
         query_words = remove_par(query_list)
         for i in range(len(query_words)):
-            if query_words[i] not in ["AND", "OR", "NOT"]:
-                query_words[i] = self.normalize(query_words[i])[0]
-        print("query : {}".format(query_list))
-        print("Creating query tree...")
-        start = time()
-        
+            if query_words[i] not in ["and", "or", "not"]:
+                normalized_word = self.normalize(query_words[i])  # is a list of 1 element
+                if len(normalized_word) == 0: # word was a stop word and got filtered
+                    print("Warning : word \"{}\" is actually a stopword".format(query_words[i]))
+                    query_words[i] = "__stopword__"
+                elif normalized_word[0] not in self.terms_to_id:
+                    print("Warning : word \"{}\" not in the index".format(query_words[i]))
+                    query_words[i] = "__UNK__"
+                else:
+                    query_words[i] = normalized_word[0]
+                    
         prios, _ = get_prios(query_list, 0, 0)
         tree = split2tree(query_words, prios)
-
-        print("Tree declared ! {:.2f} s".format(time()-start))
-        print(get_tree_rep([tree], ""))
-
-        print("Computing query result...")
-        start = time()
+        if show_tree:
+            print(query_words)
+            tree.print_tree(0)
+            
         result, pos_list = self.compute_bool_result(tree)
-        print("Done ! {:.2f}s".format(time()-start))
         
         if pos_list:
-            return result
+            _, doc_ids = result.nonzero()
         else:
             ones = np.ones(result.shape, dtype=int)
-            return ones - result
-    
-    
-    def input_query(self):
-        query = input("Enter a boolean query : \n(Example : NOT Assistant OR program AND paper)")
-        return self.treat_query(query)    
+            _, doc_ids = (ones - result).nonzero()
+            
+        docs = np.array([doc_id + 1 for doc_id in doc_ids])  # doc ids in the database start at 1
+
+        return docs
     
     
 if __name__ == '__main__':
