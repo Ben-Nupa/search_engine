@@ -1,0 +1,1 @@
+Le code est présenté dans le notebook Rapport.ipynb . Il vous sera demandé de renseigner les chemins du fichier CACM et du répertoire CS276, ainsi que les fichiers query et qrels.

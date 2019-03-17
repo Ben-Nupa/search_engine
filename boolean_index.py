@@ -2,7 +2,7 @@ import os
 import sys
 from typing import List
 import numpy as np
-from scipy.sparse import lil_matrix, csc_matrix, load_npz, save_npz
+from scipy.sparse import lil_matrix, csc_matrix, load_npz, save_npz, vstack
 import pickle
 
 from index import Index
@@ -26,13 +26,13 @@ class BooleanIndex(Index):
         title = ''
 
         nb_terms = 5462 + 2 # for the unknown words (that are in no doc) and stopwords (that are in all docs)
-        nb_docs = 3204
-        self.incidence_matrix = lil_matrix((nb_terms, nb_docs), dtype=int)  # Boolean index
+        self.nb_docs = 3204
+        self.incidence_matrix = lil_matrix((nb_terms, self.nb_docs), dtype=int)  # Boolean index
         self.terms_to_id["__UNK__"] = nb_terms-2
         self.id_to_term[nb_terms-2] = "__UNK__"
         self.terms_to_id["__stopword__"] = nb_terms-1
         self.id_to_term[nb_terms-1] = "__stopword__"
-        for i in range(nb_docs):
+        for i in range(self.nb_docs):
             self.incidence_matrix[nb_terms-1, i] = 1
         
         for line in raw_file:
@@ -86,12 +86,12 @@ class BooleanIndex(Index):
         doc_id = -1
         term_id = -1
 
-        nb_terms = 353975
-        nb_docs = 98998
+        nb_terms = 353975 +2
+        self.nb_docs = 98998
 
         for block_id in range(10):
             list_of_files = os.listdir(os.path.join(directory_name, str(block_id)))
-            block_inc_matrix = lil_matrix((nb_terms, nb_docs))
+            block_inc_matrix = lil_matrix((nb_terms, self.nb_docs))
             print("Building index for block {}:".format(block_id))
             for file_id in tqdm(range(len(list_of_files))):
                 # Reading the document
@@ -135,13 +135,12 @@ class BooleanIndex(Index):
         in order to have the .npz files)
         """
         nb_terms = 353975
-        nb_docs = 98998
+        self.nb_docs = 98998
         print("Loading index matrices")
-        self.incidence_matrix = csc_matrix((nb_terms, nb_docs))
+        self.incidence_matrix = csc_matrix((nb_terms, self.nb_docs))
         for block_id in range(10):
             self.incidence_matrix += load_npz(os.path.join("CS276_boolean_index","block_inc_matrix" + str(block_id) + ".npz"))
         self.incidence_matrix = self.incidence_matrix.tocsr()
-
         #Loading the four dictionaries
         print("Loading dictionaries")
         with open(os.path.join("CS276_boolean_index",'doc_to_id.pkl'), 'rb') as input_doc_to_id :
@@ -152,6 +151,7 @@ class BooleanIndex(Index):
             self.id_to_term = pickle.load(input_id_to_term)
         with open(os.path.join("CS276_boolean_index",'term_to_id.pkl'), 'rb') as input_term_to_id :
             self.terms_to_id = pickle.load(input_term_to_id)
+
 
 
     def compute_bool_result(self, op):  
@@ -190,7 +190,14 @@ class BooleanIndex(Index):
             right_result, right_pos = self.compute_bool_result(op.right)        
             return right_result, not right_pos
         else:
-            return self.incidence_matrix[self.terms_to_id[op.keyword]], True
+            if op.keyword in self.terms_to_id:
+                row = self.incidence_matrix[self.terms_to_id[op.keyword]]
+            else:  # __UNK__ and __stopword__ should be in the dic. If not, we are prepared
+                row = lil_matrix((1, self.nb_docs), dtype=int).tocsr()
+                if op.keyword == "__stopword__":
+                    for i in range(self.nb_docs):
+                        row[0, i] = 1
+            return row, True
 
 
     def treat_query(self, query: str, show_tree: bool=False):

@@ -53,11 +53,11 @@ def analysis(dir_path, redo_tokenization=False):
             directory = os.path.join(dir_path, str(i))
             print("Reading files from directory " + str(i) + " ...")
             fillDict(directory, tokens)
-        save_dictionnary(os.path.join(dir_path, "dictionnaire.pkl"), tokens)
+        save_dictionnary("dictionnaire.pkl", tokens)
     else :
         print("Checking the saved results without reading again the dataset")
     
-    tokens = load_saved_dictionnary(os.path.join(dir_path, "dictionnaire.pkl"))
+    tokens = load_saved_dictionnary("dictionnaire.pkl")
     
     #Question1
     print("Question 1 : "+str(sum(tokens.values()))+" terms in the vocabulary")
