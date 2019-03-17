@@ -4,11 +4,10 @@ import os
 import pickle
 from math import log
 import matplotlib.pyplot as plt
-from Index import *
+from index import *
 #======================================FIRST PART : TOKENIZATION================================================================
 
 tokenize = False  # Set to True if you want to do again the tokenization and the dictionnary, otherwise, the saved dictionnary will be loaded
-
 
 def load_saved_dictionnary(file_name):
     """Load the saved dictionnary with pickle"""
@@ -40,8 +39,6 @@ def fillDict(directory, tokens):
             for word in words:
                 tokens[word] = tokens.get(word, 0) + 1
 
-
-
 def analysis(dir_path, redo_tokenization=False):
     tokens = dict()
     
@@ -69,13 +66,13 @@ def analysis(dir_path, redo_tokenization=False):
     print("Question 2 : "+str(len(tokens))+" distinct tokens")
     
     #Question3
-    M_tot = sum(tokens.values())
-    T_tot = len(tokens)
+    T = sum(tokens.values())
+    V = len(tokens)
     tokens_half = load_saved_dictionnary("dictionnaireHalf.pkl")
-    M_half = sum(tokens_half.values())
-    T_half = len(tokens_half)
-    b = (log(M_tot) - log(M_half)) / (log(T_tot) - log(T_half))
-    k = M_tot/(T_tot**b)
+    Tp = sum(tokens_half.values())
+    Vp = len(tokens_half)
+    b = (log(V) - log(Vp)) / (log(T) - log(Tp))
+    k = V/(T**b)
     print("Question 3 : Heaps Law : k = {} and b = {}".format(k,b))
     
     #Question4
